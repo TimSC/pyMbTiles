@@ -6,6 +6,8 @@ else: text = str
 import math
 
 def ValueToNativePython(value):
+	if value.HasField("string_value"):
+		return text(value.string_value)
 	if value.HasField("float_value"):
 		return float(value.float_value)
 	if value.HasField("double_value"):
@@ -18,8 +20,6 @@ def ValueToNativePython(value):
 		return int(value.sint_value)
 	if value.HasField("bool_value"):
 		return value.bool_value != 0
-	if value.HasField("string_value"):
-		return text(value.string_value)
 	return None
 
 def NativePythonToValue(value, vp):
