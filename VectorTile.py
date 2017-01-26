@@ -93,7 +93,6 @@ class DecodeVectorTile(object):
 		self.output.Finish()
 
 	def DecodeGeometry(self, feature, extent):
-	
 		points = []
 		pointsTileSpace = []
 		currentPolygon = None
@@ -355,8 +354,8 @@ class EncodeVectorTile(DecodeVectorTileResults):
 	def Finish(self):
 		self.output.write(self.tile.SerializeToString())
 
-	def EncodeTileSpacePoints(self, points, cmdId, reverseOrder, startIndex, cursorx, cursory, outFeature):
-	
+	def EncodeTileSpacePoints(self, points, cmdId, reverseOrder, startIndex, cursorPos, outFeature):
+
 		cmdCount = len(points) - startIndex
 		cmdIdCount = (cmdId & 0x7) | (cmdCount << 3)
 		CheckCmdId(cmdIdCount, cmdId, cmdCount)
@@ -367,8 +366,8 @@ class EncodeVectorTile(DecodeVectorTileResults):
 
 		for pt in points:
 		
-			value1 = pt[0] - cursorx
-			value2 = pt[1] - cursory
+			value1 = pt[0] - cursorPos[0]
+			value2 = pt[1] - cursorPos[1]
 		
 			value1enc = (value1 << 1) ^ (value1 >> 31)
 			value2enc = (value2 << 1) ^ (value2 >> 31)
@@ -376,20 +375,20 @@ class EncodeVectorTile(DecodeVectorTileResults):
 			outFeature.geometry.append(value1enc)
 			outFeature.geometry.append(value2enc)
 
-			cursorx = pt[0]
-			cursory = pt[1]
+			cursorPos[0] = pt[0]
+			cursorPos[1] = pt[1]
 		
 	def EncodeGeometry(self, typeEnum, extent, points, lines, polygons, outFeature):
 	
 		if outFeature is None:
 			raise RuntimeError("Unexpected null pointer")
-		cursorx, cursory = 0, 0
+		cursorPos = [0, 0]
 		outFeature.type = typeEnum
 
 		if typeEnum == Tile.POINT:
 		
 			tmpTileSpace = self.ConvertToTileCoords(points, extent)
-			self.EncodeTileSpacePoints(tmpTileSpace, 1, False, 0, cursorx, cursory, outFeature)
+			self.EncodeTileSpacePoints(tmpTileSpace, 1, False, 0, cursorPos, outFeature)
 		
 		if typeEnum == Tile.LINESTRING:
 		
@@ -402,10 +401,10 @@ class EncodeVectorTile(DecodeVectorTileResults):
 				#Move to start
 				tmpPoints = []
 				tmpPoints.append(tmpTileSpace2[0])
-				self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorx, cursory, outFeature)
+				self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorPos, outFeature)
 
 				#Draw line shape
-				self.EncodeTileSpacePoints(tmpTileSpace2, 2, False, 1, cursorx, cursory, outFeature)
+				self.EncodeTileSpacePoints(tmpTileSpace2, 2, False, 1, cursorPos, outFeature)
 			
 		if typeEnum == Tile.POLYGON:
 		
@@ -421,10 +420,10 @@ class EncodeVectorTile(DecodeVectorTileResults):
 					tmpPoints = [tmpTileSpace2[-1]]
 				else:
 					tmpPoints = [tmpTileSpace2[0]]
-				self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorx, cursory, outFeature)
+				self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorPos, outFeature)
 
 				#Draw line shape of outer polygon
-				self.EncodeTileSpacePoints(tmpTileSpace2, 2, reverseOuter, 1, cursorx, cursory, outFeature)
+				self.EncodeTileSpacePoints(tmpTileSpace2, 2, reverseOuter, 1, cursorPos, outFeature)
 
 				#Close outer contour
 				cmdId = 7
@@ -445,10 +444,10 @@ class EncodeVectorTile(DecodeVectorTileResults):
 						tmpPoints = [tmpTileSpace2[-1]]
 					else:
 						tmpPoints = [tmpTileSpace2[0]]
-					self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorx, cursory, outFeature)
+					self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorPos, outFeature)
 
 					#Draw line shape of inner polygon
-					self.EncodeTileSpacePoints(tmpTileSpace2, 2, reverseInner, 1, cursorx, cursory, outFeature)
+					self.EncodeTileSpacePoints(tmpTileSpace2, 2, reverseInner, 1, cursorPos, outFeature)
 
 					#Close inner contour
 					cmdId = 7
