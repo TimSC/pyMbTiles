@@ -31,7 +31,6 @@ if __name__ == "__main__":
 	tileData = gzip.open(finaIn).read()
 	dec.DecodeTileData(tileData)
 
-	exit(0)
 	#Reencode to file
 	encData = gzip.open(finaOut, "wb")
 	enc = VectorTile.EncodeVectorTile(3, 2, 3, encData)

@@ -22,19 +22,18 @@ def ValueToNativePython(value):
 		return text(value.string_value)
 	return None
 
-def NativePythonToValue(value):
-	out = Tile.Value()
+def NativePythonToValue(value, vp):
 	if isinstance(value, int):
-		out.int_value = value
-		return out
+		vp.sint_value = int(value)
+		return
 	if isinstance(value, float):
-		out.float_value = value
-		return out
+		vp.float_value = float(value)
+		return
 	if isinstance(value, bool):
-		out.bool_value = int(value)
-		return out
-	out.string_value = text(value)
-	return out
+		vp.bool_value = int(value)
+		return
+	vp.string_value = text(value)
+	return
 
 def CheckWindingi(pts):
 
@@ -344,7 +343,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 
 			if valueIndex is None:
 				vp = self.currentLayer.values.add()
-				vp.CopyFrom(NativePythonToValue(v))
+				NativePythonToValue(v, vp)
 				valueIndex = len(self.currentLayer.values)-1
 				self.valuesCache[vStr] = valueIndex
 
