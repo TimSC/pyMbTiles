@@ -2,6 +2,38 @@ from __future__ import print_function
 from vector_tile21 import Tile
 import math
 
+def ValueToNativePython(value):
+
+	if value.string_value is not None:
+		return unicode(value.string_value)
+	if value.float_value is not None:
+		return float(value.float_value)
+	if value.double_value is not None:
+		return float(value.double_value)
+	if value.int_value is not None:
+		return int(value.int_value)
+	if value.uint_value is not None:
+		return int(value.uint_value)
+	if value.sint_value is not None:
+		return int(value.sint_value)
+	if value.bool_value is not None:
+		return value.bool_value != 0
+	return None
+
+def NativePythonToValue(value):
+	out = Tile.Value()
+	if isinstance(value, int):
+		out.int_value = value
+		return out
+	if isinstance(value, float):
+		out.float_value = value
+		return out
+	if isinstance(value, bool):
+		out.bool_value = int(value)
+		return out
+	out.string_value = unicode(value)
+	return out
+
 def CheckWindingi(pts):
 
 	total = 0.0
@@ -48,7 +80,7 @@ class DecodeVectorTile(object):
 
 				tagDict = {}
 				for tagNum in range(0, len(feature.tags), 2):
-					tagDict[layer.keys[feature.tags[tagNum]]] = layer.values[feature.tags[tagNum+1]]
+					tagDict[layer.keys[feature.tags[tagNum]]] = ValueToNativePython(layer.values[feature.tags[tagNum+1]])
 
 				points, lines, polygons = self.DecodeGeometry(feature, layer.extent)
 
@@ -204,7 +236,7 @@ class DecodeVectorTileResults(object):
 		print ("")
 
 		for k in tagDict:
-			print (k.encode("utf-8"), "=", tagDict[k].string_value.encode("utf-8"))
+			print (k.encode("utf-8"), "=", tagDict[k].encode("utf-8"))
 
 		for pt in points:
 			print ("POINT(",pt[0],",",pt[1],") ", end="")
@@ -291,28 +323,30 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		
 		for k in tagDict:
 			v = tagDict[k]
+			vStr = unicode(v)
 		
 			try:
 				keyIndex = self.keysCache[k]
 			except KeyError:
 				keyIndex = None
 			try:
-				valueIndex = self.valuesCache[v]
+				valueIndex = self.valuesCache[vStr]
 			except KeyError:
 				valueIndex = None
 
 			if keyIndex is None:
-				self.currentLayer.keys.add(k)
+				kp = self.currentLayer.keys.append(k)
 				keyIndex = len(self.currentLayer.keys)-1
 				self.keysCache[k] = keyIndex
 
 			if valueIndex is None:
-				value = self.currentLayer.values.add(v)
+				vp = self.currentLayer.values.add()
+				vp.CopyFrom(NativePythonToValue(v))
 				valueIndex = len(self.currentLayer.values)-1
-				self.valuesCache[v] = valueIndex
+				self.valuesCache[vStr] = valueIndex
 
-			feature.tags.add(keyIndex)
-			feature.tags.add(valueIndex)
+			feature.tags.append(keyIndex)
+			feature.tags.append(valueIndex)
 		
 	"""
 		#Encode geometry

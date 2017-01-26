@@ -23,10 +23,10 @@ class ExampleDataStore(VectorTile.DecodeVectorTileResults):
 
 if __name__ == "__main__":
 	#results = ExampleDataStore()
-	encData = StringIO.StringIO()
+	encData = gzip.open("mapout.mvt", "wb")
 	enc = VectorTile.EncodeVectorTile(3, 2, 3, encData)
 	dec = VectorTile.DecodeVectorTile(3, 2, 3, enc)
 	tileData = gzip.open("map.mvt").read()
 	dec.DecodeTileData(tileData)
 	
-	
+	encData.close()
