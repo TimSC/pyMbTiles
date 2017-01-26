@@ -1,21 +1,18 @@
 from __future__ import print_function
 from vector_tile21 import Tile
-from vector_tile21.vector_tile_pb2 import _TILE_GEOMTYPE as GeomType
 import math
 
-"""
-inline double CheckWindingi(LineLoop2Di pts) 
-{
-	double total = 0.0;
-	for(size_t i=0; i < pts.size(); i++)
-	{
-		size_t i2 = (i+1)%pts.size();
-		double val = ((double)(pts[i2].first) - (double)(pts[i].first))*((double)(pts[i2].second) + (double)(pts[i].second));
-		total += val;
-	}
-	return -total;
-}
+def CheckWindingi(pts):
 
+	total = 0.0
+	for i, pt in enumerate(pts):
+		i2 = (i+1)%len(pts)
+		val = float(pts[i2][0]-pt[0])*float(pts[i2][1] + pt[1])
+		total += val
+	
+	return -total
+
+"""
 void CheckCmdId(uint32_t cmdIdCount, int cmdId, size_t count)
 {
 	int cmdId2 = cmdIdCount & 0x7;
@@ -53,11 +50,7 @@ class DecodeVectorTile(object):
 				for tagNum in range(0, len(feature.tags), 2):
 					tagDict[layer.keys[feature.tags[tagNum]]] = layer.values[feature.tags[tagNum+1]]
 
-				points = []
-				lines = []
-				polygons = []
-				self.DecodeGeometry(feature, layer.extent,
-					points, lines, polygons)
+				points, lines, polygons = self.DecodeGeometry(feature, layer.extent)
 
 				self.output.Feature(feature.type, feature.id, tagDict, 
 					points, lines, polygons)
@@ -66,123 +59,111 @@ class DecodeVectorTile(object):
 		
 		self.output.Finish()
 
-	def DecodeGeometry(self, feature,
-		extent,
-		pointsOut, 
-		linesOut,
-		polygonsOut):
-		pass
+	def DecodeGeometry(self, feature, extent):
 	
-"""{
-	vector<Point2D> points;
-	vector<Point2Di> pointsTileSpace;
-	Polygon2D currentPolygon;
-	bool currentPolygonSet = false;
-	unsigned prevCmdId = 0;
+		points = []
+		pointsTileSpace = []
+		currentPolygon = None
+		currentPolygonSet = False
+		prevCmdId = 0
 
-	int cursorx = 0, cursory = 0;
-	double prevx = 0.0, prevy = 0.0; //Lat lon
-	int prevxTileSpace = 0, prevyTileSpace = 0;
-	pointsOut.clear();
-	linesOut.clear();
-	polygonsOut.clear();
+		cursorx, cursory = 0, 0
+		prevx, prevy = 0.0, 0.0 #Lat lon
+		prevxTileSpace, prevyTileSpace = 0, 0
+		pointsOut = []
+		linesOut = []
+		polygonsOut = []
+		i = 0
 
-	for(int i=0; i < feature.geometry_size(); i ++)
-	{
-		unsigned g = feature.geometry(i);
-		unsigned cmdId = g & 0x7;
-		unsigned cmdCount = g >> 3;
-		if(cmdId == 1)//MoveTo
-		{
-			for(unsigned j=0; j < cmdCount; j++)
-			{
-				unsigned v = feature.geometry(i+1);
-				int value1 = ((v >> 1) ^ (-(v & 1)));
-				v = feature.geometry(i+2);
-				int value2 = ((v >> 1) ^ (-(v & 1)));
-				cursorx += value1;
-				cursory += value2;
-				double px = self.dLon * double(cursorx) / double(extent) + self.lonMin;
-				double py = - self.dLat * double(cursory) / double(extent) + self.latMax + self.dLat;
-				
-				if (feature.type() == vector_tile::Tile_GeomType_POINT)
-					pointsOut.push_back(Point2D(px, py));
-				if (feature.type() == vector_tile::Tile_GeomType_LINESTRING && points.size() > 0)
-				{
-					linesOut.push_back(points);
-					points.clear();
-					pointsTileSpace.clear();
-				}
-				prevx = px; 
-				prevy = py;
-				prevxTileSpace = cursorx;
-				prevyTileSpace = cursory;
-				i += 2;
-				prevCmdId = cmdId;
-			}
-		}
-		if(cmdId == 2)//LineTo
-		{
-			for(unsigned j=0; j < cmdCount; j++)
-			{
-				if(prevCmdId != 2)
-				{
-					points.push_back(Point2D(prevx, prevy));
-					pointsTileSpace.push_back(Point2D(prevxTileSpace, prevyTileSpace));
-				}
-				unsigned v = feature.geometry(i+1);
-				int value1 = ((v >> 1) ^ (-(v & 1)));
-				v = feature.geometry(i+2);
-				int value2 = ((v >> 1) ^ (-(v & 1)));
-				cursorx += value1;
-				cursory += value2;
-				double px = self.dLon * double(cursorx) / double(extent) + self.lonMin;
-				double py = - self.dLat * double(cursory) / double(extent) + self.latMax + self.dLat;
+		while i < len(feature.geometry):
+			g = feature.geometry[i]
+			cmdId = g & 0x7
+			cmdCount = g >> 3
+			if cmdId == 1: #MoveTo
+				for j in range(cmdCount):
 
-				points.push_back(Point2D(px, py));
-				pointsTileSpace.push_back(Point2D(cursorx, cursory));
-				i += 2;
-				prevCmdId = cmdId;
-			}
-		}
-		if(cmdId == 7) //ClosePath
-		{
-			//Closed path does not move cursor in v1 to v2.1 of spec.
-			// https://github.com/mapbox/vector-tile-spec/issues/49
-			for(unsigned j=0; j < cmdCount; j++)
-			{
-				if (feature.type() == vector_tile::Tile_GeomType_POLYGON)
-				{
-					double winding = CheckWindingi(pointsTileSpace);
-					if(winding >= 0.0)
-					{
-						if(currentPolygonSet)
-						{
-							//We are moving on to the next polygon, so store what we have collected so far
-							polygonsOut.push_back(currentPolygon);
-							currentPolygon.first.clear();
-							currentPolygon.second.clear();
-						}
-						currentPolygon.first = points; //outer shape
-						currentPolygonSet = true;
-					}
-					else
-						currentPolygon.second.push_back(points); //inter shape
+					v = feature.geometry[i+1]
+					value1 = ((v >> 1) ^ (-(v & 1)))
+					v = feature.geometry[i+2]
+					value2 = ((v >> 1) ^ (-(v & 1)))
+					cursorx += value1
+					cursory += value2
+					px = self.dLon * float(cursorx) / float(extent) + self.lonMin
+					py = - self.dLat * float(cursory) / float(extent) + self.latMax + self.dLat
+	
+					if feature.type == Tile.POINT:
+						pointsOut.append((px, py))
+
+					if feature.type == Tile.LINESTRING and len(points) > 0:
+						linesOut.append(points)
+						points = []
+						pointsTileSpace = []
 					
-					points.clear();
-					pointsTileSpace.clear();
-					prevCmdId = cmdId;
-				}				
-			}
-		}
-	}
+					prevx = px
+					prevy = py
+					prevxTileSpace = cursorx
+					prevyTileSpace = cursory
+					i += 2
+					prevCmdId = cmdId
+				
+			if cmdId == 2: #LineTo
+			
+				for j in range(cmdCount):
 
-	if (feature.type() == vector_tile::Tile_GeomType_LINESTRING)
-		linesOut.push_back(points);
-	if (feature.type() == vector_tile::Tile_GeomType_POLYGON)
-		polygonsOut.push_back(currentPolygon);
-}
-"""
+					if prevCmdId != 2:
+						points.append((prevx, prevy))
+						pointsTileSpace.append((prevxTileSpace, prevyTileSpace))
+					
+					v = feature.geometry[i+1]
+					value1 = ((v >> 1) ^ (-(v & 1)))
+					v = feature.geometry[i+2]
+					value2 = ((v >> 1) ^ (-(v & 1)))
+					cursorx += value1
+					cursory += value2
+					px = self.dLon * float(cursorx) / float(extent) + self.lonMin
+					py = - self.dLat * float(cursory) / float(extent) + self.latMax + self.dLat
+
+					points.append((px, py))
+					pointsTileSpace.append((cursorx, cursory))
+					i += 2
+					prevCmdId = cmdId
+			
+			if cmdId == 7: #ClosePath
+			
+				#Closed path does not move cursor in v1 to v2.1 of spec.
+				# https://github.com/mapbox/vector-tile-spec/issues/49
+				for j in range(cmdCount):
+
+					if feature.type == Tile.POLYGON:
+					
+						winding = CheckWindingi(pointsTileSpace)
+						if winding >= 0.0:
+						
+							if currentPolygonSet:
+								#We are moving on to the next polygon, so store what we have collected so far
+								polygonsOut.append(currentPolygon)
+								currentPolygon = None
+								currentPolygonSet = False
+							
+							currentPolygon = [points, []] #set outer shape
+							currentPolygonSet = True
+						
+						else:
+							currentPolygon[1].append(points) #inter shape
+					
+						points = []
+						pointsTileSpace = []
+						prevCmdId = cmdId
+						
+			i += 1
+		
+		if feature.type == Tile.LINESTRING:
+			linesOut.append(points)
+		if feature.type == Tile.POLYGON:
+			polygonsOut.append(currentPolygon)
+		
+		return pointsOut, linesOut, polygonsOut
+
 # *********************************************
 
 # https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
@@ -217,13 +198,13 @@ class DecodeVectorTileResults(object):
 
 	def Feature(self, typeEnum, id, tagDict, points, lines, polygons):
 
-		print (typeEnum, GeomType.values_by_number[typeEnum].name, end="")
+		print (typeEnum, Tile.GeomType.DESCRIPTOR.values_by_number[typeEnum].name, end="")
 		if id is not None:
 			print (",id=", id, end="")
 		print ("")
 
 		for k in tagDict:
-			print (k, "=", tagDict[k].string_value)
+			print (k, "=", tagDict[k].string_value.encode("utf-8"))
 
 		for pt in points:
 			print ("POINT(",pt[0],",",pt[1],") ", end="")
@@ -422,7 +403,7 @@ void EncodeVectorTile::EncodeGeometry(vector_tile::Tile_GeomType type,
 			
 			//Move to start
 			vector<Point2Di> tmpPoints;
-			tmpPoints.push_back(tmpTileSpace2[0]);
+			tmpPoints.append(tmpTileSpace2[0]);
 			EncodeTileSpacePoints(tmpPoints, 1, false, 0, cursorx, cursory, outFeature);
 
 			//Draw line shape
@@ -443,9 +424,9 @@ void EncodeVectorTile::EncodeGeometry(vector_tile::Tile_GeomType type,
 			//Move to start of outer polygon
 			vector<Point2Di> tmpPoints;
 			if (reverseOuter)
-				tmpPoints.push_back(tmpTileSpace2[tmpTileSpace2.size()-1]);
+				tmpPoints.append(tmpTileSpace2[tmpTileSpace2.size()-1]);
 			else
-				tmpPoints.push_back(tmpTileSpace2[0]);
+				tmpPoints.append(tmpTileSpace2[0]);
 			EncodeTileSpacePoints(tmpPoints, 1, false, 0, cursorx, cursory, outFeature);
 
 			//Draw line shape of outer polygon
@@ -469,9 +450,9 @@ void EncodeVectorTile::EncodeGeometry(vector_tile::Tile_GeomType type,
 				//Move to start of inner polygon
 				vector<Point2Di> tmpPoints;
 				if (reverseInner)
-					tmpPoints.push_back(tmpTileSpace2[tmpTileSpace2.size()-1]);
+					tmpPoints.append(tmpTileSpace2[tmpTileSpace2.size()-1]);
 				else
-					tmpPoints.push_back(tmpTileSpace2[0]);
+					tmpPoints.append(tmpTileSpace2[0]);
 				EncodeTileSpacePoints(tmpPoints, 1, false, 0, cursorx, cursory, outFeature);
 
 				//Draw line shape of inner polygon
@@ -496,7 +477,7 @@ void EncodeVectorTile::ConvertToTileCoords(const LineLoop2D &points, int extent,
 	{
 		double cx = (points[i].first - self.lonMin) * double(extent) / double(self.dLon);
 		double cy = (points[i].second - self.latMax - self.dLat) * double(extent) / (-self.dLat);
-		out.push_back(Point2Di(round(cx), round(cy)));
+		out.append(Point2Di(round(cx), round(cy)));
 	}
 }
 
@@ -507,7 +488,7 @@ void EncodeVectorTile::DeduplicatePoints(const LineLoop2Di &points, LineLoop2Di 
 	for(size_t i = 0; i < points.size(); i ++)
 	{
 		if(i == 0 || px != points[i].first || py != points[i].second)
-			out.push_back(Point2Di(points[i].first, points[i].second));
+			out.append(Point2Di(points[i].first, points[i].second));
 		px = points[i].first;
 		py = points[i].second;
 	}
