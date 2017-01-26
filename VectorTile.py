@@ -364,7 +364,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		if reverseOrder:
 			points = points[::-1]
 
-		for pt in points:
+		for pt in points[startIndex::]:
 		
 			value1 = pt[0] - cursorPos[0]
 			value2 = pt[1] - cursorPos[1]
@@ -459,7 +459,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		out = []
 		for pt in points:
 			cx = (pt[0] - self.lonMin) * float(extent) / float(self.dLon)
-			cy = (pt[1] - self.latMax - self.dLat) * float(extent) / (-self.dLat)
+			cy = (pt[1] - self.latMax - self.dLat) * float(extent) / float(-self.dLat)
 			out.append((int(round(cx)), int(round(cy))))
 		return out
 	
