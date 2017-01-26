@@ -1,5 +1,7 @@
 # pyMbTiles
 
+sudo pip install protobuf
+
 The MBTiles spec is at https://github.com/mapbox/mbtiles-spec
 
 Vector tile spec is at https://github.com/mapbox/vector-tile-spec

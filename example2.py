@@ -1,7 +1,6 @@
 from __future__ import print_function
 import VectorTile
 import gzip
-import StringIO
 
 #curl https://api.mapbox.com/v4/mapbox.mapbox-streets-v7/3/2/3.vector.pbf?access_token=<API_key> > map.bin
 

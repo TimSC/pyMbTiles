@@ -1,2 +1,2 @@
-from vector_tile_pb2 import *
+from .vector_tile_pb2 import *
 

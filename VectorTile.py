@@ -1,11 +1,14 @@
 from __future__ import print_function
 from vector_tile21 import Tile
+import sys
+if sys.version_info < (3,): text = unicode
+else: text = str
 import math
 
 def ValueToNativePython(value):
 
 	if value.string_value is not None:
-		return unicode(value.string_value)
+		return text(value.string_value)
 	if value.float_value is not None:
 		return float(value.float_value)
 	if value.double_value is not None:
@@ -31,7 +34,7 @@ def NativePythonToValue(value):
 	if isinstance(value, bool):
 		out.bool_value = int(value)
 		return out
-	out.string_value = unicode(value)
+	out.string_value = text(value)
 	return out
 
 def CheckWindingi(pts):
@@ -323,7 +326,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		
 		for k in tagDict:
 			v = tagDict[k]
-			vStr = unicode(v)
+			vStr = text(v)
 		
 			try:
 				keyIndex = self.keysCache[k]
