@@ -182,7 +182,7 @@ class DecodeVectorTile(object):
 							currentPolygonSet = True
 						
 						else:
-							currentPolygon[1].append(points) #inter shape
+							currentPolygon[1].append(points) #inner shape
 					
 						points = []
 						pointsTileSpace = []
@@ -237,7 +237,7 @@ class DecodeVectorTileResults(object):
 		print ("")
 
 		for k in tagDict:
-			print (k.encode("utf-8"), "=", tagDict[k].encode("utf-8"))
+			print (text(k).encode("utf-8"), "=", text(tagDict[k]).encode("utf-8"))
 
 		for pt in points:
 			print ("POINT(",pt[0],",",pt[1],") ", end="")
@@ -284,7 +284,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		self.tileRow = tileRow
 		self.output = output
 		self.currentLayer = None
-		numTiles = pow(2,tileZoom)
+		numTiles = pow(2, tileZoom)
 		self.latMax, self.lonMin = num2deg(tileColumn, numTiles-tileRow-1, tileZoom)
 		self.latMin, self.lonMax = num2deg(tileColumn+1, numTiles-tileRow, tileZoom)
 		self.dLat = self.latMax - self.latMin
@@ -457,18 +457,14 @@ class EncodeVectorTile(DecodeVectorTileResults):
 					outFeature.geometry.append(cmdIdCount)
 
 	def ConvertToTileCoords(self, points, extent):
-
 		out = []
 		for pt in points:
-		
 			cx = (pt[0] - self.lonMin) * float(extent) / float(self.dLon)
 			cy = (pt[1] - self.latMax - self.dLat) * float(extent) / (-self.dLat)
 			out.append((int(round(cx)), int(round(cy))))
-		
 		return out
 	
 	def DeduplicatePoints(self, points):
-	
 		out = []
 		prevPt = None
 		for pt in points:
