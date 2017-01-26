@@ -47,15 +47,13 @@ def CheckWindingi(pts):
 	
 	return -total
 
-"""
-void CheckCmdId(uint32_t cmdIdCount, int cmdId, size_t count)
-{
-	int cmdId2 = cmdIdCount & 0x7;
-	size_t cmdCount2 = cmdIdCount >> 3;
-	if (cmdId != cmdId2 || count != cmdCount2)
-		throw overflow_error("Failed to encode command (probably due to number of points)");
-}
-"""
+def CheckCmdId(cmdIdCount, cmdId, count):
+	cmdIdCount = cmdIdCount & 0xFFFFFFFF #Limit to 32 bits
+	cmdId2 = cmdIdCount & 0x7
+	cmdCount2 = cmdIdCount >> 3
+	if cmdId != cmdId2 or count != cmdCount2:
+		raise OverflowError("Failed to encode command (probably due to number of points)")
+
 # **************************************************************
 
 class DecodeVectorTile(object):
@@ -166,7 +164,7 @@ class DecodeVectorTile(object):
 			if cmdId == 7: #ClosePath
 			
 				#Closed path does not move cursor in v1 to v2.1 of spec.
-				# https://github.com/mapbox/vector-tile-spec/issues/49
+				# https:#github.com/mapbox/vector-tile-spec/issues/49
 				for j in range(cmdCount):
 
 					if feature.type == Tile.POLYGON:
@@ -201,7 +199,7 @@ class DecodeVectorTile(object):
 
 # *********************************************
 
-# https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+# https:#wiki.openstreetmap.org/wiki/Slippy_map_tilenames
 def deg2num(lat_deg, lon_deg, zoom):
 	lat_rad = math.radians(lat_deg)
 	n = 2.0 ** zoom
@@ -351,173 +349,131 @@ class EncodeVectorTile(DecodeVectorTileResults):
 			feature.tags.append(keyIndex)
 			feature.tags.append(valueIndex)
 		
-	"""
 		#Encode geometry
-		#self.EncodeGeometry((vector_tile::Tile_GeomType)typeEnum,
-		#	self.currentLayer->extent(),
-		#	points, 
-		#	lines,
-		#	polygons, 
-		#	feature)
-		"""
+		self.EncodeGeometry(typeEnum, self.currentLayer.extent, points, lines, polygons, feature)
+		
 	def Finish(self):
 		self.output.write(self.tile.SerializeToString())
 
+	def EncodeTileSpacePoints(self, points, cmdId, reverseOrder, startIndex, cursorx, cursory, outFeature):
+	
+		cmdCount = len(points) - startIndex
+		cmdIdCount = (cmdId & 0x7) | (cmdCount << 3)
+		CheckCmdId(cmdIdCount, cmdId, cmdCount)
+		outFeature.geometry.append(cmdIdCount)
 
-"""
-void EncodeVectorTile::EncodeTileSpacePoints(const vector<Point2Di> &points, 
-	int cmdId,
-	bool reverseOrder,
-	size_t startIndex, 
-	int &cursorx, int &cursory, vector_tile::Tile_Feature *outFeature)
-{
-	size_t cmdCount = points.size() - startIndex;
-	uint32_t cmdIdCount = (cmdId & 0x7) | (cmdCount, 3);
-	CheckCmdId(cmdIdCount, cmdId, cmdCount);
-	outFeature->add_geometry(cmdIdCount);
+		if reverseOrder:
+			points = points[::-1]
 
-	for(size_t i = startIndex;i < points.size(); i++)
-	{
-		size_t i2 = i;
-		if(reverseOrder)
-			i2 = points.size() - 1 - i;
-
-		int32_t value1 = points[i2].first - cursorx;
-		int32_t value2 = points[i2].second - cursory;
+		for pt in points:
 		
-		uint32_t value1enc = (value1, 1) ^ (value1 >> 31);
-		uint32_t value2enc = (value2, 1) ^ (value2 >> 31);
+			value1 = pt[0] - cursorx
+			value2 = pt[1] - cursory
+		
+			value1enc = (value1 << 1) ^ (value1 >> 31)
+			value2enc = (value2 << 1) ^ (value2 >> 31)
 
-		outFeature->add_geometry(value1enc);
-		outFeature->add_geometry(value2enc);
-		cmdCount ++;
+			outFeature.geometry.append(value1enc)
+			outFeature.geometry.append(value2enc)
 
-		cursorx = points[i2].first;
-		cursory = points[i2].second;
-	}
-}
+			cursorx = pt[0]
+			cursory = pt[1]
+		
+	def EncodeGeometry(self, typeEnum, extent, points, lines, polygons, outFeature):
+	
+		if outFeature is None:
+			raise RuntimeError("Unexpected null pointer")
+		cursorx, cursory = 0, 0
+		outFeature.type = typeEnum
 
-void EncodeVectorTile::EncodeGeometry(vector_tile::Tile_GeomType type, 
-	int extent,
-	const vector<Point2D> &points, 
-	const vector<vector<Point2D> > &lines,
-	const vector<Polygon2D> &polygons,
-	vector_tile::Tile_Feature *outFeature)
-{
-	if(outFeature == NULL)
-		raise RuntimeError("Unexpected null pointer");
-	int cursorx = 0, cursory = 0;
-	//double prevx = 0.0, prevy = 0.0;
-	outFeature->set_type(type);
-	LineLoop2Di tmpTileSpace, tmpTileSpace2;
-
-	if(type == vector_tile::Tile_GeomType_POINT)
-	{
-		self.ConvertToTileCoords(points, extent, tmpTileSpace);
-		EncodeTileSpacePoints(tmpTileSpace, 1, false, 0, cursorx, cursory, outFeature);
-	}
-
-	if(type == vector_tile::Tile_GeomType_LINESTRING)
-	{
-		for(size_t i=0;i < lines.size(); i++)
-		{
-			const vector<Point2D> &line = lines[i];
-			self.ConvertToTileCoords(line, extent, tmpTileSpace);
-			self.DeduplicatePoints(tmpTileSpace, tmpTileSpace2);
-			if (tmpTileSpace2.size() < 2) continue;
+		if typeEnum == Tile.POINT:
+		
+			tmpTileSpace = self.ConvertToTileCoords(points, extent)
+			self.EncodeTileSpacePoints(tmpTileSpace, 1, False, 0, cursorx, cursory, outFeature)
+		
+		if typeEnum == Tile.LINESTRING:
+		
+			for line in lines:
 			
-			//Move to start
-			vector<Point2Di> tmpPoints;
-			tmpPoints.append(tmpTileSpace2[0]);
-			EncodeTileSpacePoints(tmpPoints, 1, false, 0, cursorx, cursory, outFeature);
-
-			//Draw line shape
-			EncodeTileSpacePoints(tmpTileSpace2, 2, false, 1, cursorx, cursory, outFeature);
-		}
-	}
-
-	if(type == vector_tile::Tile_GeomType_POLYGON)
-	{
-		for(size_t i=0;i < polygons.size(); i++)
-		{
-			const Polygon2D &polygon = polygons[i];
-			self.ConvertToTileCoords(polygon.first, extent, tmpTileSpace);
-			self.DeduplicatePoints(tmpTileSpace, tmpTileSpace2);
-			if (tmpTileSpace2.size() < 2) continue;
-			bool reverseOuter = CheckWindingi(tmpTileSpace2) < 0.0;
+				tmpTileSpace = self.ConvertToTileCoords(line, extent)
+				tmpTileSpace2 = self.DeduplicatePoints(tmpTileSpace)
+				if len(tmpTileSpace2) < 2: continue
 			
-			//Move to start of outer polygon
-			vector<Point2Di> tmpPoints;
-			if (reverseOuter)
-				tmpPoints.append(tmpTileSpace2[tmpTileSpace2.size()-1]);
-			else
-				tmpPoints.append(tmpTileSpace2[0]);
-			EncodeTileSpacePoints(tmpPoints, 1, false, 0, cursorx, cursory, outFeature);
+				#Move to start
+				tmpPoints = []
+				tmpPoints.append(tmpTileSpace2[0])
+				self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorx, cursory, outFeature)
 
-			//Draw line shape of outer polygon
-			EncodeTileSpacePoints(tmpTileSpace2, 2, reverseOuter, 1, cursorx, cursory, outFeature);
+				#Draw line shape
+				self.EncodeTileSpacePoints(tmpTileSpace2, 2, False, 1, cursorx, cursory, outFeature)
+			
+		if typeEnum == Tile.POLYGON:
+		
+			for polygon in polygons:
+			
+				tmpTileSpace = self.ConvertToTileCoords(polygon[0], extent)
+				tmpTileSpace2 = self.DeduplicatePoints(tmpTileSpace)
+				if len(tmpTileSpace2) < 2: continue
+				reverseOuter = CheckWindingi(tmpTileSpace2) < 0.0;
+			
+				#Move to start of outer polygon
+				if reverseOuter:
+					tmpPoints = [tmpTileSpace2[-1]]
+				else:
+					tmpPoints = [tmpTileSpace2[0]]
+				self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorx, cursory, outFeature)
 
-			//Close outer contour
-			uint32_t cmdId = 7;
-			uint32_t cmdCount = 1;
-			uint32_t cmdIdCount = (cmdId & 0x7) | (cmdCount, 3);
-			outFeature->add_geometry(cmdIdCount);
+				#Draw line shape of outer polygon
+				self.EncodeTileSpacePoints(tmpTileSpace2, 2, reverseOuter, 1, cursorx, cursory, outFeature)
 
-			//Inner polygons
-			for(size_t j=0;j < polygon.second.size(); j++)
-			{
-				const LineLoop2D &inner = polygon.second[j];
-				self.ConvertToTileCoords(inner, extent, tmpTileSpace);
-				self.DeduplicatePoints(tmpTileSpace, tmpTileSpace2);
-				if(tmpTileSpace2.size() < 2) continue;
-				bool reverseInner = CheckWindingi(tmpTileSpace2) >= 0.0;
+				#Close outer contour
+				cmdId = 7
+				cmdCount = 1
+				cmdIdCount = (cmdId & 0x7) | (cmdCount << 3)
+				outFeature.geometry.append(cmdIdCount)
 
-				//Move to start of inner polygon
-				vector<Point2Di> tmpPoints;
-				if (reverseInner)
-					tmpPoints.append(tmpTileSpace2[tmpTileSpace2.size()-1]);
-				else
-					tmpPoints.append(tmpTileSpace2[0]);
-				EncodeTileSpacePoints(tmpPoints, 1, false, 0, cursorx, cursory, outFeature);
+				#Inner polygons
+				for inner in polygon[1]:
+				
+					tmpTileSpace = self.ConvertToTileCoords(inner, extent)
+					tmpTileSpace2 = self.DeduplicatePoints(tmpTileSpace)
+					if len(tmpTileSpace2) < 2: continue
+					reverseInner = CheckWindingi(tmpTileSpace2) >= 0.0
 
-				//Draw line shape of inner polygon
-				EncodeTileSpacePoints(tmpTileSpace2, 2, reverseInner, 1, cursorx, cursory, outFeature);
+					#Move to start of inner polygon
+					if reverseInner:
+						tmpPoints = [tmpTileSpace2[-1]]
+					else:
+						tmpPoints = [tmpTileSpace2[0]]
+					self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorx, cursory, outFeature)
 
-				//Close inner contour
-				cmdId = 7;
-				cmdCount = 1;
-				cmdIdCount = (cmdId & 0x7) | (cmdCount, 3);
-				outFeature->add_geometry(cmdIdCount);
+					#Draw line shape of inner polygon
+					self.EncodeTileSpacePoints(tmpTileSpace2, 2, reverseInner, 1, cursorx, cursory, outFeature)
 
-			}			
-		}
-	}
+					#Close inner contour
+					cmdId = 7
+					cmdCount = 1
+					cmdIdCount = (cmdId & 0x7) | (cmdCount << 3)
+					outFeature.geometry.append(cmdIdCount)
 
-}
+	def ConvertToTileCoords(self, points, extent):
 
-void EncodeVectorTile::ConvertToTileCoords(const LineLoop2D &points, int extent, LineLoop2Di &out)
-{
-	out.clear();
-	for(size_t i = 0;i < points.size(); i++)
-	{
-		double cx = (points[i].first - self.lonMin) * double(extent) / double(self.dLon);
-		double cy = (points[i].second - self.latMax - self.dLat) * double(extent) / (-self.dLat);
-		out.append(Point2Di(round(cx), round(cy)));
-	}
-}
-
-void EncodeVectorTile::DeduplicatePoints(const LineLoop2Di &points, LineLoop2Di &out)
-{
-	out.clear();
-	int px = 0, py = 0;
-	for(size_t i = 0; i < points.size(); i ++)
-	{
-		if(i == 0 || px != points[i].first || py != points[i].second)
-			out.append(Point2Di(points[i].first, points[i].second));
-		px = points[i].first;
-		py = points[i].second;
-	}
-}
-"""
-
+		out = []
+		for pt in points:
+		
+			cx = (pt[0] - self.lonMin) * float(extent) / float(self.dLon)
+			cy = (pt[1] - self.latMax - self.dLat) * float(extent) / (-self.dLat)
+			out.append((int(round(cx)), int(round(cy))))
+		
+		return out
+	
+	def DeduplicatePoints(self, points):
+	
+		out = []
+		prevPt = None
+		for pt in points:
+			if prevPt is None or prevPt != pt:
+				out.append(pt);
+			prevPt = pt
+		return out
 
