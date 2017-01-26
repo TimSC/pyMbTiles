@@ -1,6 +1,7 @@
 from __future__ import print_function
 import VectorTile
 import gzip
+import StringIO
 
 #curl https://api.mapbox.com/v4/mapbox.mapbox-streets-v7/3/2/3.vector.pbf?access_token=<API_key> > map.bin
 
@@ -21,8 +22,11 @@ class ExampleDataStore(VectorTile.DecodeVectorTileResults):
 			tagDict, pointsOut, linesOut, polygonsOut)
 
 if __name__ == "__main__":
-	results = ExampleDataStore()
-	dec = VectorTile.DecodeVectorTile(3, 2, 3, results)
+	#results = ExampleDataStore()
+	encData = StringIO.StringIO()
+	enc = VectorTile.EncodeVectorTile(3, 2, 3, encData)
+	dec = VectorTile.DecodeVectorTile(3, 2, 3, enc)
 	tileData = gzip.open("map.mvt").read()
 	dec.DecodeTileData(tileData)
+	
 	

@@ -204,7 +204,7 @@ class DecodeVectorTileResults(object):
 		print ("")
 
 		for k in tagDict:
-			print (k, "=", tagDict[k].string_value.encode("utf-8"))
+			print (k.encode("utf-8"), "=", tagDict[k].string_value.encode("utf-8"))
 
 		for pt in points:
 			print ("POINT(",pt[0],",",pt[1],") ", end="")
@@ -240,106 +240,94 @@ class DecodeVectorTileResults(object):
 	def Finish(self):
 		pass
 
+
+# *********************************************************************************
+
+class EncodeVectorTile(DecodeVectorTileResults):
+	def __init__(self, tileZoom, tileColumn, tileRow, output): 
+
+		self.tileZoom = tileZoom
+		self.tileColumn = tileColumn
+		self.tileRow = tileRow
+		self.output = output
+		self.currentLayer = None
+		numTiles = pow(2,tileZoom)
+		self.latMax, self.lonMin = num2deg(tileColumn, numTiles-tileRow-1, tileZoom)
+		self.latMin, self.lonMax = num2deg(tileColumn+1, numTiles-tileRow, tileZoom)
+		self.dLat = self.latMax - self.latMin
+		self.dLon = self.lonMax - self.lonMin
+		self.tile = Tile()
+		self.keysCache = {}
+		self.valuesCache = {}
+		
+	def NumLayers(self, numLayers):
+		pass
+
+	def LayerStart(self, name, version, extent):
+		if self.currentLayer is not None:
+			raise RuntimeError("Previous layer not closed")
+		self.currentLayer = self.tile.layers.add()
+		self.currentLayer.name = name
+		self.currentLayer.version = version
+		self.currentLayer.extent = extent
+
+	def LayerEnd(self):
+
+		if self.currentLayer is None:
+			raise RuntimeError("Layer not started")
+		self.currentLayer = None;
+		self.keysCache = {}
+		self.valuesCache = {}
+
+	def Feature(self, typeEnum, id, tagDict, points, lines, polygons):
+	
+		if self.currentLayer is None:
+			raise RuntimeError("Cannot add feature: layer not started")
+	
+		feature = self.currentLayer.features.add()
+
+		if id is not None:
+			feature.id = id
+		
+		for k in tagDict:
+			v = tagDict[k]
+		
+			try:
+				keyIndex = self.keysCache[k]
+			except KeyError:
+				keyIndex = None
+			try:
+				valueIndex = self.valuesCache[v]
+			except KeyError:
+				valueIndex = None
+
+			if keyIndex is None:
+				self.currentLayer.keys.add(k)
+				keyIndex = len(self.currentLayer.keys)-1
+				self.keysCache[k] = keyIndex
+
+			if valueIndex is None:
+				value = self.currentLayer.values.add(v)
+				valueIndex = len(self.currentLayer.values)-1
+				self.valuesCache[v] = valueIndex
+
+			feature.tags.add(keyIndex)
+			feature.tags.add(valueIndex)
+		
+	"""
+		#Encode geometry
+		#self.EncodeGeometry((vector_tile::Tile_GeomType)typeEnum,
+		#	self.currentLayer->extent(),
+		#	points, 
+		#	lines,
+		#	polygons, 
+		#	feature)
+		"""
+	def Finish(self):
+		self.output.write(self.tile.SerializeToString())
+
+
 """
-// *********************************************************************************
-
-EncodeVectorTile::EncodeVectorTile(int tileZoom, int tileColumn, int tileRow, std::ostream &output): tileZoom(tileZoom), tileColumn(tileColumn), tileRow(tileRow), output(&output), currentLayer(NULL)
-{
-	self.numTiles = pow(2,tileZoom);
-	self.lonMin = tilex2long(tileColumn, tileZoom);
-	self.latMax = tiley2lat(numTiles-tileRow-1, tileZoom);
-	self.lonMax = tilex2long(tileColumn+1, tileZoom);
-	self.latMin = tiley2lat(numTiles-tileRow, tileZoom);
-	self.dLat = self.latMax - self.latMin;
-	self.dLon = self.lonMax - self.lonMin;
-}
-
-EncodeVectorTile::~EncodeVectorTile()
-{
-
-}
-
-void EncodeVectorTile::NumLayers(int numLayers)
-{
-
-}
-
-void EncodeVectorTile::LayerStart(const char *name, int version, int extent)
-{
-	if (self.currentLayer != NULL)
-		throw runtime_error("Previous layer not closed");
-	self.currentLayer = self.tile.add_layers();
-	self.currentLayer->set_name(name);
-	self.currentLayer->set_version(version);
-	self.currentLayer->set_extent(extent);
-}
-
-void EncodeVectorTile::LayerEnd()
-{
-	if (self.currentLayer == NULL)
-		throw runtime_error("Layer not started");
-	self.currentLayer = NULL;
-	self.keysCache.clear();
-	self.valuesCache.clear();
-}
-
-void EncodeVectorTile::Feature(int typeEnum, unsigned long long id, 
-	const std::map<std::string, std::string> &tagMap,
-	std::vector<Point2D> &points, 
-	std::vector<std::vector<Point2D> > &lines,
-	std::vector<Polygon2D> &polygons)
-{
-	if (self.currentLayer == NULL)
-		throw runtime_error("Cannot add feature: layer not started");
-	
-	vector_tile::Tile_Feature* feature = self.currentLayer->add_features();
-	if(hasId)
-		feature->set_id(id);
-
-	for(std::map<std::string, std::string>::const_iterator it = tagMap.begin(); it != tagMap.end(); it++)
-	{
-		map<std::string, int>::iterator keyChk = self.keysCache.find(it->first);
-		map<std::string, int>::iterator valueChk = self.valuesCache.find(it->second);
-		int keyIndex = -1, valueIndex = -1;
-
-		if(keyChk == self.keysCache.end())
-		{
-			self.currentLayer->add_keys(it->first);
-			keyIndex = self.currentLayer->keys_size()-1;
-			self.keysCache[it->first] = keyIndex;
-		}
-		else
-			keyIndex = keyChk->second;
-
-		if(valueChk == self.valuesCache.end())
-		{
-			vector_tile::Tile_Value *value = self.currentLayer->add_values();
-			value->set_string_value(it->second);
-			valueIndex = self.currentLayer->values_size()-1;
-			self.valuesCache[it->second] = valueIndex;
-		}
-		else
-			valueIndex = valueChk->second;
-
-		feature->add_tags(keyIndex);
-		feature->add_tags(valueIndex);
-	}
-	
-	//Encode geometry
-	self.EncodeGeometry((vector_tile::Tile_GeomType)typeEnum,
-		self.currentLayer->extent(),
-		points, 
-		lines,
-		polygons, 
-		feature);
-	
-}
-
-void EncodeVectorTile::Finish()
-{
-	self.tile.SerializeToOstream(self.output);
-}
-
 void EncodeVectorTile::EncodeTileSpacePoints(const vector<Point2Di> &points, 
 	int cmdId,
 	bool reverseOrder,
@@ -380,7 +368,7 @@ void EncodeVectorTile::EncodeGeometry(vector_tile::Tile_GeomType type,
 	vector_tile::Tile_Feature *outFeature)
 {
 	if(outFeature == NULL)
-		throw runtime_error("Unexpected null pointer");
+		raise RuntimeError("Unexpected null pointer");
 	int cursorx = 0, cursory = 0;
 	//double prevx = 0.0, prevy = 0.0;
 	outFeature->set_type(type);
@@ -494,3 +482,5 @@ void EncodeVectorTile::DeduplicatePoints(const LineLoop2Di &points, LineLoop2Di 
 	}
 }
 """
+
+
