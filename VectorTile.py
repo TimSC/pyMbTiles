@@ -1,65 +1,9 @@
 from __future__ import print_function
 from vector_tile21 import Tile
+from vector_tile21.vector_tile_pb2 import _TILE_GEOMTYPE as GeomType
 import math
 
 """
-string FeatureTypeToStr(int typeIn)
-{
-	::vector_tile::Tile_GeomType type = (::vector_tile::Tile_GeomType)typeIn;
-	if(type == ::vector_tile::Tile_GeomType_UNKNOWN)
-		return "Unknown";
-	if(type == ::vector_tile::Tile_GeomType_POINT)
-		return "Point";
-	if(type == ::vector_tile::Tile_GeomType_LINESTRING)
-		return "LineString";
-	if(type == ::vector_tile::Tile_GeomType_POLYGON)
-		return "Polygon";
-	return "Unknown type";
-}
-
-string ValueToStr(const ::vector_tile::Tile_Value &value)
-{
-	if(value.has_string_value())
-		return value.string_value();
-	if(value.has_float_value())
-	{
-		stringstream ss;
-		ss, value.float_value();
-		return ss.str();
-	}
-	if(value.has_double_value())
-	{
-		stringstream ss;
-		ss, value.double_value();
-		return ss.str();
-	}
-	if(value.has_int_value())
-	{
-		stringstream ss;
-		ss, value.int_value();
-		return ss.str();
-	}
-	if(value.has_uint_value())
-	{
-		stringstream ss;
-		ss, value.uint_value();
-		return ss.str();
-	}
-	if(value.has_sint_value())
-	{
-		stringstream ss;
-		ss, value.sint_value();
-		return ss.str();
-	}
-	if(value.has_bool_value())
-	{
-		stringstream ss;
-		ss, value.bool_value();
-		return ss.str();
-	}
-	return "Error: Unknown value type";
-}
-
 inline double CheckWindingi(LineLoop2Di pts) 
 {
 	double total = 0.0;
@@ -95,50 +39,41 @@ class DecodeVectorTile(object):
 		tile = Tile()
 
 		parsed = tile.ParseFromString(tileData)
+		self.output.NumLayers(len(tile.layers))
 
-"""
-		self.output->NumLayers(tile.layers_size());	
-
-		for(int layerNum = 0; layerNum < tile.layers_size(); layerNum++)
-		{
-			const ::vector_tile::Tile_Layer &layer = tile.layers(layerNum);
-			self.output->LayerStart(layer.name().c_str(), layer.version(), layer.extent());
-
+		for layer in tile.layers:
+			self.output.LayerStart(layer.name, layer.version, layer.extent)
+			
 			#The spec says "Decoders SHOULD parse the version first to ensure that 
 			#they are capable of decoding each layer." This has not been implemented.
 
-			for(int featureNum = 0; featureNum < layer.features_size(); featureNum++)
-			{
-				const ::vector_tile::Tile_Feature &feature = layer.features(featureNum);
+			for feature in layer.features:
 
-				map<string, string> tagMap;
-				for(int tagNum = 0; tagNum < feature.tags_size(); tagNum+=2)
-				{	
-					const ::vector_tile::Tile_Value &value = layer.values(feature.tags(tagNum+1));
-					tagMap[layer.keys(feature.tags(tagNum))] = ValueToStr(value);
-				}
+				tagDict = {}
+				for tagNum in range(0, len(feature.tags), 2):
+					tagDict[layer.keys[feature.tags[tagNum]]] = layer.values[feature.tags[tagNum+1]]
 
-				vector<Point2D> points;
-				vector<vector<Point2D> > lines;
-				vector<Polygon2D> polygons;
-				self.DecodeGeometry(feature, layer.extent(),
-					points, lines, polygons);
+				points = []
+				lines = []
+				polygons = []
+				self.DecodeGeometry(feature, layer.extent,
+					points, lines, polygons)
 
-				self.output->Feature(feature.type(), feature.has_id(), feature.id(), tagMap, 
-					points, lines, polygons);
-			}
+				self.output.Feature(feature.type, feature.id, tagDict, 
+					points, lines, polygons)
 
-			self.output->LayerEnd();
-		}
+			self.output.LayerEnd()
+		
+		self.output.Finish()
 
-		self.output->Finish();
-
-void DecodeVectorTile::DecodeGeometry(const ::vector_tile::Tile_Feature &feature,
-	int extent,
-	vector<Point2D> &pointsOut, 
-	vector<vector<Point2D> > &linesOut,
-	vector<Polygon2D> &polygonsOut)	
-{
+	def DecodeGeometry(self, feature,
+		extent,
+		pointsOut, 
+		linesOut,
+		polygonsOut):
+		pass
+	
+"""{
 	vector<Point2D> points;
 	vector<Point2Di> pointsTileSpace;
 	Polygon2D currentPolygon;
@@ -280,15 +215,15 @@ class DecodeVectorTileResults(object):
 	def LayerEnd(self):
 		print ("layer end")
 
-	def Feature(self, typeEnum, hasId, id, tagDict, points, lines, polygons):
+	def Feature(self, typeEnum, id, tagDict, points, lines, polygons):
 
-		print (typeEnum, FeatureTypeToStr(typeEnum), end="")
-		if hasId:
+		print (typeEnum, GeomType.values_by_number[typeEnum].name, end="")
+		if id is not None:
 			print (",id=", id, end="")
 		print ("")
 
 		for k in tagDict:
-			print (k, "=", tagDict[k])
+			print (k, "=", tagDict[k].string_value)
 
 		for pt in points:
 			print ("POINT(",pt[0],",",pt[1],") ", end="")
@@ -298,33 +233,27 @@ class DecodeVectorTileResults(object):
 			for pt in line:
 				print ("(",pt[0],",",pt[1],") ", end="")
 			print (") ", end="")
-			"""
-		for(size_t i =0; i < polygons.size(); i++)
-		{
-			Polygon2D &polygon = polygons[i];
-			print ("POLYGON((";
-			LineLoop2D &linePts = polygon.first; //Outer shape
-			for(size_t j =0; j < linePts.size(); j++)
-				print ("("<<linePts[j].first<<","<<linePts[j].second<<") ";
-			print (")";
-			if(polygon.second.size() > 0)
-			{
-				//Inner shape
-				print (",(";
-				for(size_t k =0; k < polygon.second.size(); k++)
-				{
-					print ("(";
-					LineLoop2D &linePts2 = polygon.second[k];
-					for(size_t j =0; j < linePts2.size(); j++)
-						print ("("<<linePts2[j].first<<","<<linePts2[j].second<<") ";
-					print (") ";
-				}
-				print (")";
-			}
+		
+		for polygon in polygons:
+		
+			print ("POLYGON((", end="")
+			linePts = polygon[0] #Outer shape
+			for pt in linePts:
+				print ("(",pt[0],",",pt[1],") ", end="")
+			print (")", end="")
+			if len(polygon[1]) > 0:
+				#Inner shape
+				print (",(",end="")
+				for lineLoop in polygon[1]:
+					print ("(",end="")
+					for pt in lineLoop:
+						print ("(",pt[0],",",pt[1],") ",end="")
+					print (") ",end="")
+				print (")",end="")
 
-			print (") ";
-		}
-"""
+			print (") ",end="")
+		
+
 		print ("")
 
 	def Finish(self):
@@ -373,7 +302,7 @@ void EncodeVectorTile::LayerEnd()
 	self.valuesCache.clear();
 }
 
-void EncodeVectorTile::Feature(int typeEnum, bool hasId, unsigned long long id, 
+void EncodeVectorTile::Feature(int typeEnum, unsigned long long id, 
 	const std::map<std::string, std::string> &tagMap,
 	std::vector<Point2D> &points, 
 	std::vector<std::vector<Point2D> > &lines,
