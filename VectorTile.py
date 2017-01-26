@@ -6,21 +6,20 @@ else: text = str
 import math
 
 def ValueToNativePython(value):
-
-	if value.string_value is not None:
-		return text(value.string_value)
-	if value.float_value is not None:
+	if value.HasField("float_value"):
 		return float(value.float_value)
-	if value.double_value is not None:
+	if value.HasField("double_value"):
 		return float(value.double_value)
-	if value.int_value is not None:
+	if value.HasField("int_value"):
 		return int(value.int_value)
-	if value.uint_value is not None:
+	if value.HasField("uint_value"):
 		return int(value.uint_value)
-	if value.sint_value is not None:
+	if value.HasField("sint_value"):
 		return int(value.sint_value)
-	if value.bool_value is not None:
+	if value.HasField("bool_value"):
 		return value.bool_value != 0
+	if value.HasField("string_value"):
+		return text(value.string_value)
 	return None
 
 def NativePythonToValue(value):
@@ -85,7 +84,11 @@ class DecodeVectorTile(object):
 
 				points, lines, polygons = self.DecodeGeometry(feature, layer.extent)
 
-				self.output.Feature(feature.type, feature.id, tagDict, 
+				fid = None
+				if feature.HasField("id"):
+					fid = feature.id
+			
+				self.output.Feature(feature.type, fid, tagDict, 
 					points, lines, polygons)
 
 			self.output.LayerEnd()
