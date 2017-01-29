@@ -198,6 +198,18 @@ class DecodeVectorTile(object):
 		
 		return pointsOut, linesOut, polygonsOut
 
+	@property
+	def POINT(self):
+		return Tile.POINT
+
+	@property
+	def LINESTRING(self):
+		return Tile.LINESTRING
+
+	@property
+	def POLYGON(self):
+		return Tile.POLYGON
+
 # *********************************************
 
 # https:#wiki.openstreetmap.org/wiki/Slippy_map_tilenames
@@ -297,7 +309,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 	def NumLayers(self, numLayers):
 		pass
 
-	def LayerStart(self, name, version, extent):
+	def LayerStart(self, name, version, extent = 4096):
 		if self.currentLayer is not None:
 			raise RuntimeError("Previous layer not closed")
 		self.currentLayer = self.tile.layers.add()
@@ -473,4 +485,16 @@ class EncodeVectorTile(DecodeVectorTileResults):
 				out.append(pt);
 			prevPt = pt
 		return out
+
+	@property
+	def POINT(self):
+		return Tile.POINT
+
+	@property
+	def LINESTRING(self):
+		return Tile.LINESTRING
+
+	@property
+	def POLYGON(self):
+		return Tile.POLYGON
 
