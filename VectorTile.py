@@ -58,8 +58,8 @@ class DecodeVectorTile(object):
 	def __init__(self, tileZoom, tileColumn, tileRow, output):
 		self.output = output
 		numTiles = pow(2,tileZoom)
-		self.latMax, self.lonMin = num2deg(tileColumn, tileRow+1, tileZoom)
-		self.latMin, self.lonMax = num2deg(tileColumn+1, tileRow+2, tileZoom)
+		self.latMax, self.lonMin = num2deg(tileColumn, tileRow, tileZoom)
+		self.latMin, self.lonMax = num2deg(tileColumn+1, tileRow+1, tileZoom)
 		self.dLat = self.latMax - self.latMin
 		self.dLon = self.lonMax - self.lonMin
 
@@ -123,7 +123,7 @@ class DecodeVectorTile(object):
 					cursorx += value1
 					cursory += value2
 					px = self.dLon * float(cursorx) / float(extent) + self.lonMin
-					py = - self.dLat * float(cursory) / float(extent) + self.latMax + self.dLat
+					py = - self.dLat * float(cursory) / float(extent) + self.latMax
 	
 					if feature.type == Tile.POINT:
 						pointsOut.append((px, py))
@@ -155,7 +155,7 @@ class DecodeVectorTile(object):
 					cursorx += value1
 					cursory += value2
 					px = self.dLon * float(cursorx) / float(extent) + self.lonMin
-					py = - self.dLat * float(cursory) / float(extent) + self.latMax + self.dLat
+					py = - self.dLat * float(cursory) / float(extent) + self.latMax
 
 					points.append((px, py))
 					pointsTileSpace.append((cursorx, cursory))
@@ -298,8 +298,8 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		self.output = output
 		self.currentLayer = None
 		numTiles = pow(2, tileZoom)
-		self.latMax, self.lonMin = num2deg(tileColumn, tileRow+1, tileZoom)
-		self.latMin, self.lonMax = num2deg(tileColumn+1, tileRow+2, tileZoom)
+		self.latMax, self.lonMin = num2deg(tileColumn, tileRow, tileZoom)
+		self.latMin, self.lonMax = num2deg(tileColumn+1, tileRow+1, tileZoom)
 		self.dLat = self.latMax - self.latMin
 		self.dLon = self.lonMax - self.lonMin
 		self.tile = Tile()
@@ -473,7 +473,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		out = []
 		for pt in points:
 			cx = (pt[0] - self.lonMin) * float(extent) / float(self.dLon)
-			cy = (pt[1] - self.latMax - self.dLat) * float(extent) / float(-self.dLat)
+			cy = (pt[1] - self.latMax) * float(extent) / float(-self.dLat)
 			out.append((int(round(cx)), int(round(cy))))
 		return out
 	
