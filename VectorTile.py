@@ -58,8 +58,8 @@ class DecodeVectorTile(object):
 	def __init__(self, tileZoom, tileColumn, tileRow, output):
 		self.output = output
 		numTiles = pow(2,tileZoom)
-		self.latMax, self.lonMin = num2deg(tileColumn, numTiles-tileRow-1, tileZoom)
-		self.latMin, self.lonMax = num2deg(tileColumn+1, numTiles-tileRow, tileZoom)
+		self.latMax, self.lonMin = num2deg(tileColumn, tileRow+1, tileZoom)
+		self.latMin, self.lonMax = num2deg(tileColumn+1, tileRow+2, tileZoom)
 		self.dLat = self.latMax - self.latMin
 		self.dLon = self.lonMax - self.lonMin
 
@@ -286,8 +286,8 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		self.output = output
 		self.currentLayer = None
 		numTiles = pow(2, tileZoom)
-		self.latMax, self.lonMin = num2deg(tileColumn, numTiles-tileRow-1, tileZoom)
-		self.latMin, self.lonMax = num2deg(tileColumn+1, numTiles-tileRow, tileZoom)
+		self.latMax, self.lonMin = num2deg(tileColumn, tileRow+1, tileZoom)
+		self.latMin, self.lonMax = num2deg(tileColumn+1, tileRow+2, tileZoom)
 		self.dLat = self.latMax - self.latMin
 		self.dLon = self.lonMax - self.lonMin
 		self.tile = Tile()
