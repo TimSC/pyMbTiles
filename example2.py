@@ -20,21 +20,30 @@ class ExampleDataStore(VectorTile.DecodeVectorTileResults):
 if __name__ == "__main__":
 	finaIn = "map.mvt"
 	finaOut = "mapout.mvt"
+	tileZoom = 3
+	tileColumn = 2
+	tileRow = 3
 	if len(sys.argv) >= 2:
 		finaIn = sys.argv[1]
 	if len(sys.argv) >= 3:
 		finaOut = sys.argv[2]
+	if len(sys.argv) >= 4:
+		tileZoom = int(sys.argv[3])
+	if len(sys.argv) >= 5:
+		tileColumn = int(sys.argv[4])
+	if len(sys.argv) >= 6:
+		tileRow = int(sys.argv[5])
 
 	#Print decoded data to screen
 	results = ExampleDataStore()
-	dec = VectorTile.DecodeVectorTile(3, 2, 3, results)
+	dec = VectorTile.DecodeVectorTile(tileZoom, tileColumn, tileRow, results)
 	tileData = gzip.open(finaIn).read()
 	dec.DecodeTileData(tileData)
 
 	#Reencode to file
 	encData = gzip.open(finaOut, "wb")
-	enc = VectorTile.EncodeVectorTile(3, 2, 3, encData)
-	dec = VectorTile.DecodeVectorTile(3, 2, 3, enc)
+	enc = VectorTile.EncodeVectorTile(tileZoom, tileColumn, tileRow, encData)
+	dec = VectorTile.DecodeVectorTile(tileZoom, tileColumn, tileRow, enc)
 	tileData = gzip.open(finaIn).read()
 	dec.DecodeTileData(tileData)
 	

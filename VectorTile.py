@@ -223,7 +223,7 @@ class DecodeVectorTileResults(object):
 	def NumLayers(self, numLayers):
 		print("Num layers: ", numLayers)
 
-	def LayerStart(self, name, version, extent):
+	def LayerStart(self, name, version, extent = 4096):
 		print ("layer name: ", name)
 		print ("layer version: ", version)
 
