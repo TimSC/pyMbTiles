@@ -11,6 +11,7 @@ class MBTiles(object):
 		self.schemaReady = False
 
 	def __del__(self):
+		self.conn.commit()
 		self.c.close()
 		del self.conn
 
@@ -75,8 +76,6 @@ class MBTiles(object):
 		if self.c.rowcount == 0:
 			self.c.execute("INSERT INTO tiles (zoom_level, tile_column, tile_row, tile_data) VALUES (?, ?, ?, ?);", 
 				(zoomLevel, tileColumn, tileRow, data))
-
-		self.conn.commit()
 
 	def DeleteTile(self, zoomLevel, tileColumn, tileRow):
 		if not self.schemaReady:
