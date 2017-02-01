@@ -445,6 +445,9 @@ class EncodeVectorTile(DecodeVectorTileResults):
 				cmdIdCount = (cmdId & 0x7) | (cmdCount << 3)
 				outFeature.geometry.append(cmdIdCount)
 
+				if len(polygon) < 2:
+					continue
+
 				#Inner polygons
 				for inner in polygon[1]:
 				
