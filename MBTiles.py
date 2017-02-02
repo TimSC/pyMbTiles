@@ -39,6 +39,9 @@ class MBTiles(object):
 		sql = "CREATE TABLE IF NOT EXISTS tiles (zoom_level integer, tile_column integer, tile_row integer, tile_data blob)"
 		self.c.execute(sql)
 
+		sql = "CREATE INDEX IF NOT EXISTS tiles_index ON tiles (zoom_level, tile_column, tile_row)"
+		self.c.execute(sql)
+
 		self.schemaReady = True
 
 	def GetAllMetaData(self):
