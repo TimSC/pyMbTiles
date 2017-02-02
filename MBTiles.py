@@ -88,6 +88,9 @@ class MBTiles(object):
 		if self.c.rowcount == 0:
 			raise RuntimeError("Tile not found")
 
+	def Commit(self):
+		self.conn.commit()
+
 if __name__ == "__main__":
 	mbTiles	= MBTiles("andorra.mbtiles")
 	metadata = mbTiles.GetAllMetaData()
