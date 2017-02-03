@@ -97,7 +97,7 @@ class DecodeVectorTile(object):
 	def DecodeGeometry(self, feature, extent):
 		points = []
 		pointsTileSpace = []
-		currentPolygon = None
+		currentPolygon = [[]]
 		currentPolygonSet = False
 		prevCmdId = 0
 
@@ -176,7 +176,7 @@ class DecodeVectorTile(object):
 							if currentPolygonSet:
 								#We are moving on to the next polygon, so store what we have collected so far
 								polygonsOut.append(currentPolygon)
-								currentPolygon = None
+								currentPolygon = [[]]
 								currentPolygonSet = False
 							
 							currentPolygon = [points, []] #set outer shape
@@ -268,7 +268,7 @@ class DecodeVectorTileResults(object):
 			for pt in linePts:
 				print ("(",pt[0],",",pt[1],") ", end="")
 			print (")", end="")
-			if len(polygon[1]) > 0:
+			if len(polygon) >= 2:
 				#Inner shape
 				print (",(",end="")
 				for lineLoop in polygon[1]:
@@ -329,7 +329,12 @@ class EncodeVectorTile(DecodeVectorTileResults):
 	
 		if self.currentLayer is None:
 			raise RuntimeError("Cannot add feature: layer not started")
-	
+
+		#Check if there is any data to encode
+		if typeEnum == Tile.POINT and len(points) == 0: return
+		if typeEnum == Tile.LINESTRING and len(lines) == 0: return
+		if typeEnum == Tile.POLYGON and len(polygons) == 0: return
+		
 		feature = self.currentLayer.features.add()
 
 		if id is not None:
@@ -419,9 +424,9 @@ class EncodeVectorTile(DecodeVectorTileResults):
 
 				#Draw line shape
 				self.EncodeTileSpacePoints(tmpTileSpace2, 2, False, 1, cursorPos, outFeature)
-			
+
 		if typeEnum == Tile.POLYGON:
-		
+
 			for polygon in polygons:
 			
 				tmpTileSpace = self.ConvertToTileCoords(polygon[0], extent)
