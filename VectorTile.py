@@ -501,3 +501,25 @@ class EncodeVectorTile(DecodeVectorTileResults):
 	def POLYGON(self):
 		return Tile.POLYGON
 
+
+class FilterFinish(object):
+	# Leaves the tile incomplete, so further data can be added
+	# during merging.
+	def __init__(self, output):
+		self.output = output
+
+	def NumLayers(self, numLayers):
+		self.output.NumLayers(numLayers)
+
+	def LayerStart(self, name, version, extent = 4096):
+		self.output.LayerStart(name, version, extent)
+
+	def LayerEnd(self):
+		self.output.LayerEnd()
+
+	def Feature(self, typeEnum, id, tagDict, points, lines, polygons):
+		self.output.Feature(typeEnum, id, tagDict, points, lines, polygons)
+
+	def Finish(self):
+		pass
+
