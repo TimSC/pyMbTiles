@@ -330,11 +330,44 @@ class EncodeVectorTile(DecodeVectorTileResults):
 		if self.currentLayer is None:
 			raise RuntimeError("Cannot add feature: layer not started")
 
-		#Check if there is any data to encode
-		if typeEnum == Tile.POINT and len(points) == 0: return
-		if typeEnum == Tile.LINESTRING and len(lines) == 0: return
-		if typeEnum == Tile.POLYGON and len(polygons) == 0: return
+		#Convert to tile coordinates and deduplicate points
+		tcPoints, tcLines, tcPolygons = [], [], []
+		if typeEnum == Tile.POINT:
+			tcPoints = self.ConvertToTileCoords(points, self.currentLayer.extent)
 		
+		if typeEnum == Tile.LINESTRING:
+			tcLines = []
+			for line in lines:
+				tmpTileSpace = self.ConvertToTileCoords(line, self.currentLayer.extent)
+				tmpTileSpace2 = self.DeduplicatePoints(tmpTileSpace)
+				if len(tmpTileSpace2) >= 2:
+					tcLines.append(tmpTileSpace2)
+
+		if typeEnum == Tile.POLYGON:
+			
+			for polygon in polygons:
+				#Outer shape
+				tmpTileSpace = self.ConvertToTileCoords(polygon[0], self.currentLayer.extent)
+				tmpTileSpace2 = self.DeduplicatePoints(tmpTileSpace)
+				if len(tmpTileSpace2) < 2:
+					continue
+
+				innerShapes = []
+				if len(polygon) >= 2:
+					#Inner shapes
+					for inner in polygon[1]:
+						tmpTileSpace3 = self.ConvertToTileCoords(inner, self.currentLayer.extent)
+						tmpTileSpace4 = self.DeduplicatePoints(tmpTileSpace3)
+						if len(tmpTileSpace4) >= 2:
+							innerShapes.append(tmpTileSpace4)
+
+				tcPolygons.append([tmpTileSpace2, innerShapes])
+		
+		#Check if there is any data to encode
+		if typeEnum == Tile.POINT and len(tcPoints) == 0: return
+		if typeEnum == Tile.LINESTRING and len(tcLines) == 0: return
+		if typeEnum == Tile.POLYGON and len(tcPolygons) == 0: return
+
 		feature = self.currentLayer.features.add()
 
 		if id is not None:
@@ -368,7 +401,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 			feature.tags.append(valueIndex)
 		
 		#Encode geometry
-		self.EncodeGeometry(typeEnum, self.currentLayer.extent, points, lines, polygons, feature)
+		self.EncodeGeometry(typeEnum, tcPoints, tcLines, tcPolygons, feature)
 		
 	def Finish(self):
 		self.output.write(self.tile.SerializeToString())
@@ -397,7 +430,7 @@ class EncodeVectorTile(DecodeVectorTileResults):
 			cursorPos[0] = pt[0]
 			cursorPos[1] = pt[1]
 		
-	def EncodeGeometry(self, typeEnum, extent, points, lines, polygons, outFeature):
+	def EncodeGeometry(self, typeEnum, tcPoints, tcLines, tcPolygons, outFeature):
 	
 		if outFeature is None:
 			raise RuntimeError("Unexpected null pointer")
@@ -406,43 +439,35 @@ class EncodeVectorTile(DecodeVectorTileResults):
 
 		if typeEnum == Tile.POINT:
 		
-			tmpTileSpace = self.ConvertToTileCoords(points, extent)
-			self.EncodeTileSpacePoints(tmpTileSpace, 1, False, 0, cursorPos, outFeature)
+			self.EncodeTileSpacePoints(tcPoints, 1, False, 0, cursorPos, outFeature)
 		
 		if typeEnum == Tile.LINESTRING:
 		
-			for line in lines:
-			
-				tmpTileSpace = self.ConvertToTileCoords(line, extent)
-				tmpTileSpace2 = self.DeduplicatePoints(tmpTileSpace)
-				if len(tmpTileSpace2) < 2: continue
+			for line in tcLines:
 			
 				#Move to start
 				tmpPoints = []
-				tmpPoints.append(tmpTileSpace2[0])
+				tmpPoints.append(line[0])
 				self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorPos, outFeature)
 
 				#Draw line shape
-				self.EncodeTileSpacePoints(tmpTileSpace2, 2, False, 1, cursorPos, outFeature)
+				self.EncodeTileSpacePoints(line, 2, False, 1, cursorPos, outFeature)
 
 		if typeEnum == Tile.POLYGON:
 
-			for polygon in polygons:
-			
-				tmpTileSpace = self.ConvertToTileCoords(polygon[0], extent)
-				tmpTileSpace2 = self.DeduplicatePoints(tmpTileSpace)
-				if len(tmpTileSpace2) < 2: continue
-				reverseOuter = CheckWindingi(tmpTileSpace2) < 0.0;
+			for polygon in tcPolygons:
+				outerShape = polygon[0]
+				reverseOuter = CheckWindingi(outerShape) < 0.0;
 			
 				#Move to start of outer polygon
 				if reverseOuter:
-					tmpPoints = [tmpTileSpace2[-1]]
+					tmpPoints = [outerShape[-1]]
 				else:
-					tmpPoints = [tmpTileSpace2[0]]
+					tmpPoints = [outerShape[0]]
 				self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorPos, outFeature)
 
 				#Draw line shape of outer polygon
-				self.EncodeTileSpacePoints(tmpTileSpace2, 2, reverseOuter, 1, cursorPos, outFeature)
+				self.EncodeTileSpacePoints(outerShape, 2, reverseOuter, 1, cursorPos, outFeature)
 
 				#Close outer contour
 				cmdId = 7
@@ -456,20 +481,17 @@ class EncodeVectorTile(DecodeVectorTileResults):
 				#Inner polygons
 				for inner in polygon[1]:
 				
-					tmpTileSpace = self.ConvertToTileCoords(inner, extent)
-					tmpTileSpace2 = self.DeduplicatePoints(tmpTileSpace)
-					if len(tmpTileSpace2) < 2: continue
-					reverseInner = CheckWindingi(tmpTileSpace2) >= 0.0
+					reverseInner = CheckWindingi(inner) >= 0.0
 
 					#Move to start of inner polygon
 					if reverseInner:
-						tmpPoints = [tmpTileSpace2[-1]]
+						tmpPoints = [inner[-1]]
 					else:
-						tmpPoints = [tmpTileSpace2[0]]
+						tmpPoints = [inner[0]]
 					self.EncodeTileSpacePoints(tmpPoints, 1, False, 0, cursorPos, outFeature)
 
 					#Draw line shape of inner polygon
-					self.EncodeTileSpacePoints(tmpTileSpace2, 2, reverseInner, 1, cursorPos, outFeature)
+					self.EncodeTileSpacePoints(inner, 2, reverseInner, 1, cursorPos, outFeature)
 
 					#Close inner contour
 					cmdId = 7
