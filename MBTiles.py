@@ -1,6 +1,6 @@
 from __future__ import print_function
 import sqlite3, zlib
-
+import sys
 #Implements https://github.com/mapbox/mbtiles-spec/blob/master/1.2/spec.md
 
 class MBTiles(object):
@@ -95,13 +95,17 @@ class MBTiles(object):
 		self.conn.commit()
 
 if __name__ == "__main__":
-	mbTiles	= MBTiles("andorra.mbtiles")
+	fina = "andorra.mbtiles"
+	if len(sys.argv) > 1:
+		fina = sys.argv[1]
+
+	mbTiles	= MBTiles(fina)
 	metadata = mbTiles.GetAllMetaData()
 	for k in metadata:
 		print (k, metadata[k])
 	#print (mbTiles.ListTiles())
 	
-	data = mbTiles.GetTile(14, 8275, 10323)
+	data = mbTiles.GetTile(14, 8323, 10862)
 	print ("compressed", len(data))
 	print ("uncompressed", len(zlib.decompress(data, 16+zlib.MAX_WBITS)))
 	#mbTiles.SetTile(14, 8275, 10323, data)
