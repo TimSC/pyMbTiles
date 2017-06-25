@@ -105,12 +105,18 @@ if __name__ == "__main__":
 		print (k, metadata[k])
 	#print (mbTiles.ListTiles())
 	
-	data = mbTiles.GetTile(14, 8323, 10862)
+	data = mbTiles.GetTile(12, 1936, 2779)
 	print ("compressed", len(data))
-	print ("uncompressed", len(zlib.decompress(data, 16+zlib.MAX_WBITS)))
+	decData = zlib.decompress(data, 16+zlib.MAX_WBITS)
+	print ("uncompressed", len(decData))
 	#mbTiles.SetTile(14, 8275, 10323, data)
 
 	metadata = mbTiles.GetAllMetaData()
 	mbTiles.SetMetaData("foo", "bar")
 	mbTiles.DeleteMetaData("foo")
+
+	fi = open("out.mvt", "wb")
+	fi.write(data)
+	fi.close()
+	print ("Saved out.mvt")
 
