@@ -96,16 +96,29 @@ class MBTiles(object):
 
 if __name__ == "__main__":
 	fina = "andorra.mbtiles"
+	zoom = 12
+	tilex = 1936
+	tiley = 2779
 	if len(sys.argv) > 1:
 		fina = sys.argv[1]
+	if len(sys.argv) > 2:
+		zoom = int(sys.argv[2])
+	if len(sys.argv) > 3:
+		tilex = int(sys.argv[3])
+	if len(sys.argv) > 4:
+		tiley = int(sys.argv[4])
 
 	mbTiles	= MBTiles(fina)
 	metadata = mbTiles.GetAllMetaData()
 	for k in metadata:
 		print (k, metadata[k])
-	#print (mbTiles.ListTiles())
 	
-	data = mbTiles.GetTile(12, 1936, 2779)
+	try:
+		data = mbTiles.GetTile(zoom, tilex, tiley)
+	except RuntimeError as err:
+		print (err)
+		print ("The first 100 tiles:", mbTiles.ListTiles()[:100])
+		exit(0)
 	print ("compressed", len(data))
 	decData = zlib.decompress(data, 16+zlib.MAX_WBITS)
 	print ("uncompressed", len(decData))
