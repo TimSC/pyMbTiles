@@ -1,5 +1,5 @@
 from __future__ import print_function
-from vector_tile21 import Tile
+from .vector_tile21 import Tile
 import sys
 if sys.version_info < (3,): text = unicode
 else: text = str
